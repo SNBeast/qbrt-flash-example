@@ -1,0 +1,28 @@
+{
+  "name": "qbrt-flash-example",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/SNBeast/qbrt-flash-example#readme",
+  "bugs": {
+    "url": "https://github.com/SNBeast/qbrt-flash-example/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SNBeast/qbrt-flash-example.git"
+  },
+  "license": "Unlicense",
+  "author": "SNBeast",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0"
+  },
+  "dependencies": {
+    "qbrt-flash": "github:SNBeast/qbrt-flash"
+  }
+}

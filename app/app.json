@@ -1,0 +1,13 @@
+{
+  "name": "FlashTest",
+  "longName": "Qbrt Flash Example",
+  "version": "1.0.0",
+  "author": {
+    "name": "SNBeast",
+    "url": "https://github.com/SNBeast/"
+  },
+  "homepage": "https://github.com/SNBeast/qbrt-flash-test",
+  "appUrlStart": "https://ultrasounds.com/",
+  "appUrlPattern": "^http(s|):\\/\\/ultrasounds\\.com\\/.*$",
+  "comment": "The author of this project has not interacted with ultrasounds.com's author nor explored the site beyond its Flash test page."
+}
