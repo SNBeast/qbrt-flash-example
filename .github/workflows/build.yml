@@ -1,0 +1,128 @@
+name: Publish Build
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+
+jobs:
+  win-build:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v7
+    - name: Set up Node.js 26.x
+      uses: actions/setup-node@v7
+      with:
+        node-version: 26.x
+        cache: 'npm'
+    - name: Install dependencies
+      run: npm install
+    - name: Pack into zip and create installer
+      run: node index.js win32
+    - name: Fetch variables
+      run: |
+        $app = Get-Content -Path 'app\app.json' -Raw | ConvertFrom-Json
+        echo "appName=$(echo $app.name)" >> $env:GITHUB_ENV
+        echo "appVersion=$(echo $app.version)" >> $env:GITHUB_ENV
+        echo "exeFile=$('{0}.exe' -f $app.name)" >> $env:GITHUB_ENV
+        echo "zipFile=$('{0}.v{1}.zip' -f $app.name, $app.version)" >> $env:GITHUB_ENV
+    - name: Fill in NSIS script
+      run: (Get-Content .\installer.nsi).Replace('[APPNAME]', $env:appName).Replace('[APPFILE]', $env:exeFile).Replace('[VERSION]', $env:appVersion) | Set-Content .\installer.nsi
+    - name: Unpack zip
+      run: |
+        md dist
+        md dist\win
+        tar -xf $env:zipFile -C dist\win
+    - name: Install NSIS
+      run: |
+        Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
+        scoop bucket add extras
+        scoop install nsis
+        echo "$env:USERPROFILE\scoop\shims" >> $env:GITHUB_PATH
+    - name: Create NSIS installer
+      run: makensis installer.nsi
+    - name: Remove intermediate files
+      run: rd -r dist\win
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@master
+      with:
+        name: artifact-win
+        path: dist
+  mac-build:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v7
+    - name: Set up Node.js 26.x
+      uses: actions/setup-node@v7
+      with:
+        node-version: 26.x
+        cache: 'npm'
+    - name: Install dependencies
+      run: npm install
+    - name: Pack into dmg
+      run: node index.js darwin
+    - name: Fetch variables
+      run: |
+        echo "appName=$(plutil -extract name raw app/app.json)" >> $GITHUB_ENV
+        echo "appVersion=$(plutil -extract version raw app/app.json)" >> $GITHUB_ENV
+    - name: Mount dmg
+      run: |
+        mkdir -p dist
+        hdiutil attach "$appName.v$appVersion.dmg" -mountpoint "dist/mac" -nobrowse
+    - name: Install create-dmg
+      run: brew install create-dmg
+    - name: Create .dmg file
+      run: |
+        create-dmg --volname "$appName" \
+        --window-pos 200 120 --window-size 660 400 \
+        --icon-size 100 --icon "$appName.app" 160 100 \
+        --app-drop-link 500 100 \
+        --add-file "readme.rtf" "app/mac_readme.rtf" 330 260 \
+        "dist/$appName-MacOS-Installer-$appVersion.dmg" "dist/mac"
+    - name: Remove intermediate state
+      run: hdiutil detach "dist/mac"
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@master
+      with:
+        name: artifact-mac
+        path: dist
+  mac-legacy-build:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v7
+    - name: Set up Node.js 26.x
+      uses: actions/setup-node@v7
+      with:
+        node-version: 26.x
+        cache: 'npm'
+    - name: Install dependencies
+      run: npm install
+    - name: Pack into dmg
+      run: node index.js darwinLegacy
+    - name: Fetch variables
+      run: |
+        echo "appName=$(plutil -extract name raw app/app.json)" >> $GITHUB_ENV
+        echo "appVersion=$(plutil -extract version raw app/app.json)" >> $GITHUB_ENV
+    - name: Mount dmg
+      run: |
+        mkdir -p dist
+        hdiutil attach "$appName.v$appVersion.legacy.dmg" -mountpoint "dist/mac" -nobrowse
+    - name: Install create-dmg
+      run: brew install create-dmg
+    - name: Create .dmg file
+      run: |
+        create-dmg --volname "$appName" \
+        --window-pos 200 120 --window-size 660 400 \
+        --icon-size 100 --icon "$appName.app" 160 100 \
+        --app-drop-link 500 100 \
+        --add-file "readme.rtf" "app/mac_readme.rtf" 330 260 \
+        "dist/$appName-Legacy-MacOS-Installer-$appVersion.dmg" "dist/mac"
+    - name: Remove intermediate state
+      run: hdiutil detach "dist/mac"
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@master
+      with:
+        name: artifact-mac-legacy
+        path: dist
