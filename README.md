@@ -34,7 +34,7 @@ Required for building.
 A [semantic version](https://semver.org/) for your application. Must additionally have each number be between 0 and 65535 inclusive.
 
 ### `identifier`
-Optional to specify for building, defaults to `com.qbrt-flash.<author>.<name>` lowercased.
+Required for building but optional to specify, defaults to `com.qbrt-flash.<author>.<name>` lowercased.
 
 A reverse domain-styled identifier for the app.
 
@@ -42,6 +42,9 @@ A reverse domain-styled identifier for the app.
 Required for building if `identifier` is unspecified.
 
 If `identifier` is unspecified, then this shall consist of letters, numbers, and hyphens, with neither the end nor beginning being a hyphen.
+
+### `startWidth`, `startHeight`, `resizable`
+The initial width and height of the window and whether the window is resizable. If not resizable, then the window will also not have scrollbars.
 
 ### `appUrlStart`
 The URL that the app will load on startup.

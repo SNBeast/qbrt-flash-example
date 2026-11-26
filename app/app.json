@@ -9,5 +9,8 @@
   "homepage": "https://github.com/SNBeast/qbrt-flash-test",
   "appUrlStart": "https://ultrasounds.com/",
   "appUrlPattern": "^http(s|):\\/\\/ultrasounds\\.com\\/.*$",
+  "startWidth": "800",
+  "startHeight": "600",
+  "resizable": true,
   "comment": "The author of this project has not interacted with ultrasounds.com's author nor explored the site beyond its Flash test page."
 }
