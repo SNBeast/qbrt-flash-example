@@ -18,37 +18,51 @@ jobs:
         node-version: 26.x
         cache: 'npm'
     - name: Install dependencies
-      run: npm install
-    - name: Pack into zip and create installer
-      run: node index.js win32
+      run: |
+        npm install
+        Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
+        scoop bucket add extras
+        scoop install nsis
+        echo "$env:USERPROFILE\scoop\shims" >> $env:GITHUB_PATH
     - name: Fetch variables
       run: |
         $app = Get-Content -Path 'app\app.json' -Raw | ConvertFrom-Json
         echo "appName=$(echo $app.name)" >> $env:GITHUB_ENV
         echo "appVersion=$(echo $app.version)" >> $env:GITHUB_ENV
         echo "exeFile=$('{0}.exe' -f $app.name)" >> $env:GITHUB_ENV
-        echo "zipFile=$('{0}.v{1}.zip' -f $app.name, $app.version)" >> $env:GITHUB_ENV
+        echo "zipPrefix=$('{0}.v{1}' -f $app.name, $app.version)" >> $env:GITHUB_ENV
+        echo "outPrefix=$('{0}-Windows-Installer-{1}' -f $app.name, $app.version)" >> $env:GITHUB_ENV
     - name: Fill in NSIS script
       run: (Get-Content .\installer.nsi).Replace('[APPNAME]', $env:appName).Replace('[APPFILE]', $env:exeFile).Replace('[VERSION]', $env:appVersion) | Set-Content .\installer.nsi
-    - name: Unpack zip
+    - name: Create zips
+      run: |
+        node index.js windows ia32
+        node index.js windows x64
+    - name: Unpack zip (ia32)
       run: |
         md dist
         md dist\win
-        tar -xf $env:zipFile -C dist\win
-    - name: Install NSIS
-      run: |
-        Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
-        scoop bucket add extras
-        scoop install nsis
-        echo "$env:USERPROFILE\scoop\shims" >> $env:GITHUB_PATH
-    - name: Create NSIS installer
+        tar -xf $('{0}.ia32.zip' -f $env:zipPrefix) -C dist\win
+    - name: Create NSIS installer (ia32)
       run: makensis installer.nsi
-    - name: Remove intermediate files
-      run: rd -r dist\win
+    - name: Remove intermediate files (ia32)
+      run: |
+        rd -r dist\win
+        Rename-Item -Path dist\$('{0}.exe' -f $env:outPrefix) -NewName $('{0}.ia32.exe' -f $env:outPrefix)
+    - name: Unpack zip (x64)
+      run: |
+        md dist\win
+        tar -xf $('{0}.x64.zip' -f $env:zipPrefix) -C dist\win
+    - name: Create NSIS installer (x64)
+      run: makensis installer.nsi
+    - name: Remove intermediate files (x64)
+      run: |
+        rd -r dist\win
+        Rename-Item -Path dist\$('{0}.exe' -f $env:outPrefix) -NewName $('{0}.x64.exe' -f $env:outPrefix)
     - name: Upload Artifacts
       uses: actions/upload-artifact@master
       with:
-        name: artifact-win
+        name: artifact-windows
         path: dist
   mac-build:
     runs-on: macos-latest
@@ -60,36 +74,48 @@ jobs:
         node-version: 26.x
         cache: 'npm'
     - name: Install dependencies
-      run: npm install
-    - name: Pack into dmg
-      run: node index.js darwin
+      run: |
+        npm install
+        brew install create-dmg
+    - name: Create dmg sources
+      run: |
+        node index.js macos ia32
+        node index.js macos x64
     - name: Fetch variables
       run: |
         echo "appName=$(plutil -extract name raw app/app.json)" >> $GITHUB_ENV
         echo "appVersion=$(plutil -extract version raw app/app.json)" >> $GITHUB_ENV
-    - name: Mount dmg
+    - name: Mount source dmg (ia32)
       run: |
         mkdir -p dist
-        hdiutil attach "$appName.v$appVersion.dmg" -mountpoint "dist/mac" -nobrowse
-    - name: Install create-dmg
-      run: brew install create-dmg
-    - name: Create .dmg file
+        hdiutil attach "$appName.v$appVersion.ia32.dmg" -mountpoint "dist/mac" -nobrowse
+    - name: Create .dmg file (ia32)
       run: |
         create-dmg --volname "$appName" \
         --window-pos 200 120 --window-size 660 400 \
         --icon-size 100 --icon "$appName.app" 160 100 \
         --app-drop-link 500 100 \
         --add-file "readme.rtf" "app/mac_readme.rtf" 330 260 \
-        "dist/$appName-MacOS-Installer-$appVersion.dmg" "dist/mac"
-    - name: Remove intermediate state
-      run: hdiutil detach "dist/mac"
+        "dist/$appName-MacOS-Installer-$appVersion.ia32.dmg" "dist/mac"
+        hdiutil detach "dist/mac"
+    - name: Mount source dmg (x64)
+      run: hdiutil attach "$appName.v$appVersion.x64.dmg" -mountpoint "dist/mac" -nobrowse
+    - name: Create .dmg file (x64)
+      run: |
+        create-dmg --volname "$appName" \
+        --window-pos 200 120 --window-size 660 400 \
+        --icon-size 100 --icon "$appName.app" 160 100 \
+        --app-drop-link 500 100 \
+        --add-file "readme.rtf" "app/mac_readme.rtf" 330 260 \
+        "dist/$appName-MacOS-Installer-$appVersion.x64.dmg" "dist/mac"
+        hdiutil detach "dist/mac"
     - name: Upload Artifacts
       uses: actions/upload-artifact@master
       with:
-        name: artifact-mac
+        name: artifact-macos
         path: dist
-  mac-legacy-build:
-    runs-on: macos-latest
+  linux-build:
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
     - name: Set up Node.js 26.x
@@ -99,30 +125,15 @@ jobs:
         cache: 'npm'
     - name: Install dependencies
       run: npm install
-    - name: Pack into dmg
-      run: node index.js darwinLegacy
-    - name: Fetch variables
+    - name: Create packages
       run: |
-        echo "appName=$(plutil -extract name raw app/app.json)" >> $GITHUB_ENV
-        echo "appVersion=$(plutil -extract version raw app/app.json)" >> $GITHUB_ENV
-    - name: Mount dmg
-      run: |
-        mkdir -p dist
-        hdiutil attach "$appName.v$appVersion.legacy.dmg" -mountpoint "dist/mac" -nobrowse
-    - name: Install create-dmg
-      run: brew install create-dmg
-    - name: Create .dmg file
-      run: |
-        create-dmg --volname "$appName" \
-        --window-pos 200 120 --window-size 660 400 \
-        --icon-size 100 --icon "$appName.app" 160 100 \
-        --app-drop-link 500 100 \
-        --add-file "readme.rtf" "app/mac_readme.rtf" 330 260 \
-        "dist/$appName-Legacy-MacOS-Installer-$appVersion.dmg" "dist/mac"
-    - name: Remove intermediate state
-      run: hdiutil detach "dist/mac"
+        node index.js linux ia32
+        node index.js linux x64
+        node index.js linux armv7l
+        mkdir dist
+        mv *.tgz dist\
     - name: Upload Artifacts
       uses: actions/upload-artifact@master
       with:
-        name: artifact-mac-legacy
+        name: artifact-linux
         path: dist

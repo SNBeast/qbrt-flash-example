@@ -24,5 +24,8 @@
   },
   "dependencies": {
     "qbrt-flash": "github:SNBeast/qbrt-flash"
+  },
+  "allowScripts": {
+    "node-liblzma@5.1.3": true
   }
 }
